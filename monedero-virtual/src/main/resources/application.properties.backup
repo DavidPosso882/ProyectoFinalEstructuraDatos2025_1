@@ -1,0 +1,39 @@
+spring.application.name=monedero-virtual
+
+# Server Configuration
+server.port=8080
+
+# H2 Database Configuration (File-based for persistence)
+spring.datasource.url=jdbc:h2:file:./data/monederodb
+spring.datasource.driverClassName=org.h2.Driver
+spring.datasource.username=sa
+spring.datasource.password=password
+spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
+spring.h2.console.enabled=true
+spring.h2.console.path=/h2-console
+
+# JPA/Hibernate Configuration
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+
+# Hazelcast Configuration
+spring.hazelcast.enabled=true
+spring.cache.type=hazelcast
+# Exclude Redis auto-configuration
+spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+
+# Disable Liquibase for now
+spring.liquibase.enabled=false
+
+# Springdoc OpenAPI (Swagger UI) Configuration
+springdoc.swagger-ui.path=/swagger-ui.html
+springdoc.api-docs.path=/v3/api-docs
+
+# Actuator Endpoints
+management.endpoints.web.exposure.include=health,info
+management.endpoint.health.show-details=always
+
+# JWT Configuration
+jwt.secret=MiClaveSecretaSuperLargaYComplejaParaPruebasNoUsarEnProduccionCambiarEstoYaMismo
+jwt.expiration.ms=3600000

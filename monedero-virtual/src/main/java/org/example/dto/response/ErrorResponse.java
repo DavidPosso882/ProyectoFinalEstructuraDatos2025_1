@@ -1,0 +1,31 @@
+package org.example.dto.response;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+import java.util.Map;
+
+/**
+ * Standardized error response for API errors.
+ */
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class ErrorResponse {
+    private int status;
+    private String message;
+    private Map<String, String> errors;
+    private String path;
+    private LocalDateTime timestamp = LocalDateTime.now();
+    
+    public ErrorResponse(int status, String message, Map<String, String> errors, String path) {
+        this.status = status;
+        this.message = message;
+        this.errors = errors;
+        this.path = path;
+    }
+}

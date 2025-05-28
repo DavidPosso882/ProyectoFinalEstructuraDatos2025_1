@@ -1,0 +1,315 @@
+import React, { useState } from 'react';
+import { 
+  Container, 
+  Grid, 
+  Typography, 
+  Box, 
+  Button,
+  useTheme,
+  useMediaQuery,
+  Paper
+} from '@mui/material';
+import { 
+  Add as AddIcon,
+} from '@mui/icons-material';
+import { useSelector } from 'react-redux';
+import { RootState } from '../store';
+import { UserRank } from '../types/points.types';
+import { TransactionType, TransactionStatus, Transaction } from '../types/transaction.types';
+
+// Importar componentes modulares
+import EnhancedSpendingChart from '../visualizations/EnhancedSpendingChart';
+import FinancialStats from '../components/dashboard/FinancialStats';
+import PointsSystem from '../components/dashboard/PointsSystem';
+import TransactionsList from '../components/dashboard/TransactionsList';
+import WalletsSummary from '../components/dashboard/WalletsSummary';
+
+// Tipos para los monederos
+type WalletType = 'PRIMARY' | 'SAVINGS' | 'EXPENSES' | 'INVESTMENT' | 'CUSTOM';
+
+interface Wallet {
+  id: number;
+  name: string;
+  balance: number;
+  type: WalletType;
+  description: string;
+  isDefault?: boolean;
+  isFavorite?: boolean;
+}
+
+// Datos de ejemplo para desarrollo
+const mockWallets: Wallet[] = [
+  {
+    id: 1,
+    name: 'Principal',
+    balance: 2500.75,
+    type: 'PRIMARY',
+    description: 'Cuenta principal para gastos diarios',
+    isDefault: true,
+    isFavorite: true
+  },
+  {
+    id: 2,
+    name: 'Ahorros',
+    balance: 5000.00,
+    type: 'SAVINGS',
+    description: 'Ahorros a largo plazo',
+    isFavorite: false
+  },
+  {
+    id: 3,
+    name: 'Gastos',
+    balance: 750.25,
+    type: 'EXPENSES',
+    description: 'Gastos diarios y recurrentes',
+    isFavorite: true
+  },
+  {
+    id: 4,
+    name: 'Inversiones',
+    balance: 10000.00,
+    type: 'INVESTMENT',
+    description: 'Cartera de inversiones',
+    isFavorite: false
+  }
+];
+
+// Datos de ejemplo para transacciones
+const mockTransactions: Transaction[] = [
+  { 
+    id: 1, 
+    amount: 500.00, 
+    description: 'Depósito inicial', 
+    transactionType: TransactionType.DEPOSIT, 
+    status: TransactionStatus.COMPLETED, 
+    destinationWalletId: 1, 
+    createdAt: '2023-04-10T10:30:00',
+    updatedAt: '2023-04-10T10:30:00'
+  },
+  { 
+    id: 2, 
+    amount: 150.00, 
+    description: 'Compra supermercado', 
+    transactionType: TransactionType.WITHDRAWAL, 
+    status: TransactionStatus.COMPLETED, 
+    sourceWalletId: 1, 
+    createdAt: '2023-04-12T15:45:00',
+    updatedAt: '2023-04-12T15:45:00'
+  },
+  { 
+    id: 3, 
+    amount: 1000.00, 
+    description: 'Transferencia a ahorros', 
+    transactionType: TransactionType.TRANSFER, 
+    status: TransactionStatus.COMPLETED, 
+    sourceWalletId: 1, 
+    destinationWalletId: 2, 
+    createdAt: '2023-04-15T09:20:00',
+    updatedAt: '2023-04-15T09:20:00'
+  },
+  { 
+    id: 4, 
+    amount: 75.50, 
+    description: 'Compra supermercado', 
+    transactionType: TransactionType.WITHDRAWAL, 
+    status: TransactionStatus.COMPLETED, 
+    sourceWalletId: 3, 
+    createdAt: '2023-04-18T12:10:00',
+    updatedAt: '2023-04-18T12:10:00'
+  },
+  { 
+    id: 5, 
+    amount: 200.00, 
+    description: 'Pago programado', 
+    transactionType: TransactionType.PAYMENT, 
+    status: TransactionStatus.PENDING, 
+    sourceWalletId: 1, 
+    destinationWalletId: 3, 
+    createdAt: '2023-05-01T08:00:00',
+    updatedAt: '2023-05-01T08:00:00'
+  }
+];
+
+// Datos de ejemplo para el gráfico de gastos
+const generateMockSpendingData = () => {
+  const categories = ['Alimentación', 'Transporte', 'Entretenimiento', 'Servicios', 'Otros'];
+  const data = [];
+  
+  // Generar datos para los últimos 3 meses
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setMonth(startDate.getMonth() - 3);
+  
+  let currentDate = new Date(startDate);
+  
+  while (currentDate <= endDate) {
+    // Generar entre 1 y 3 transacciones por día
+    const transactionsCount = Math.floor(Math.random() * 3) + 1;
+    
+    for (let i = 0; i < transactionsCount; i++) {
+      const category = categories[Math.floor(Math.random() * categories.length)];
+      const amount = Math.floor(Math.random() * 100) + 10; // Entre 10 y 110
+      
+      data.push({
+        date: new Date(currentDate),
+        amount,
+        category
+      });
+    }
+    
+    // Avanzar al siguiente día
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+  
+  return data;
+};
+
+const Dashboard: React.FC = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isMedium = useMediaQuery(theme.breakpoints.down('md'));
+  const { user } = useSelector((state: RootState) => state.auth);
+  
+  // Estados para datos simulados
+  const [wallets, setWallets] = useState(mockWallets);
+  const [transactions, setTransactions] = useState(mockTransactions);
+  const [spendingData, setSpendingData] = useState(generateMockSpendingData());
+  
+  // Datos simulados para el sistema de puntos
+  const [pointsData, setPointsData] = useState({
+    currentRank: UserRank.SILVER,
+    currentPoints: 1250,
+    pointsToNextRank: 3750, // Para llegar a GOLD (5000)
+  });
+  
+  // Datos simulados para el resumen financiero
+  const financialSummary = {
+    totalBalance: wallets.reduce((sum, wallet) => sum + wallet.balance, 0),
+    totalIncome: 1500.00,
+    totalExpenses: 825.50,
+    expenseRatio: 55, // Porcentaje de gastos respecto a ingresos
+    topCategory: 'Alimentación',
+    topCategoryAmount: 350.75,
+    upcomingTransaction: {
+      date: '01/05/2023',
+      description: 'Transferencia programada',
+      amount: -200.00
+    }
+  };
+  
+  return (
+    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      {/* Encabezado */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+        <Typography variant="h4" component="h1" fontWeight="bold">
+          Dashboard
+        </Typography>
+        <Button 
+          variant="contained" 
+          startIcon={<AddIcon />}
+          sx={{ 
+            borderRadius: 2,
+            textTransform: 'none',
+            px: 3
+          }}
+        >
+          Nueva Transacción
+        </Button>
+      </Box>
+      
+      {/* Estadísticas Financieras */}
+      <Box sx={{ mb: 4 }}>
+        <FinancialStats 
+          totalBalance={financialSummary.totalBalance}
+          totalIncome={financialSummary.totalIncome}
+          totalExpenses={financialSummary.totalExpenses}
+          expenseRatio={financialSummary.expenseRatio}
+          topCategory={financialSummary.topCategory}
+          topCategoryAmount={financialSummary.topCategoryAmount}
+          upcomingTransaction={financialSummary.upcomingTransaction}
+        />
+      </Box>
+      
+      {/* Monederos */}
+      <Grid container spacing={4} sx={{ mb: 4 }}>
+        <Grid item xs={12}>
+          <Paper 
+            elevation={0}
+            sx={{ 
+              p: 3, 
+              borderRadius: 3,
+              bgcolor: theme.palette.background.paper,
+              boxShadow: theme.shadows[2]
+            }}
+          >
+            <WalletsSummary wallets={wallets} />
+          </Paper>
+        </Grid>
+      </Grid>
+      
+      {/* Sistema de Puntos y Transacciones (lado a lado) */}
+      <Grid container spacing={4} sx={{ mb: 4 }}>
+        {/* Sistema de Puntos */}
+        <Grid item xs={12} md={6}>
+          <Paper 
+            elevation={0}
+            sx={{ 
+              p: 3, 
+              borderRadius: 3,
+              bgcolor: theme.palette.background.paper,
+              boxShadow: theme.shadows[2],
+              height: '100%'
+            }}
+          >
+            <PointsSystem 
+              currentPoints={pointsData.currentPoints}
+              currentRank={pointsData.currentRank}
+              pointsToNextRank={pointsData.pointsToNextRank}
+            />
+          </Paper>
+        </Grid>
+        
+        {/* Transacciones */}
+        <Grid item xs={12} md={6}>
+          <Paper 
+            elevation={0}
+            sx={{ 
+              p: 3, 
+              borderRadius: 3,
+              bgcolor: theme.palette.background.paper,
+              boxShadow: theme.shadows[2],
+              height: '100%'
+            }}
+          >
+            <TransactionsList transactions={transactions} />
+          </Paper>
+        </Grid>
+      </Grid>
+      
+      {/* Gráfico de Patrones de Gasto (ancho completo) */}
+      <Grid container spacing={4}>
+        <Grid item xs={12}>
+          <Paper 
+            elevation={0}
+            sx={{ 
+              p: 3, 
+              borderRadius: 3,
+              bgcolor: theme.palette.background.paper,
+              boxShadow: theme.shadows[2]
+            }}
+          >
+            <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+              Análisis de Patrones de Gasto
+            </Typography>
+            <EnhancedSpendingChart 
+              data={spendingData}
+              height={350}
+            />
+          </Paper>
+        </Grid>
+      </Grid>
+    </Container>
+  );
+};
+
+export default Dashboard;

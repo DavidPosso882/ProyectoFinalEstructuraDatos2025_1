@@ -1,0 +1,219 @@
+package org.example.controller;
+
+import jakarta.validation.Valid;
+import org.example.dto.request.LoginRequest;
+import org.example.dto.request.SignupRequest;
+import org.example.dto.request.VerifyTokenRequest;
+import org.example.dto.response.JwtResponse;
+import org.example.dto.response.MessageResponse;
+import org.example.model.PointsAccount;
+import org.example.model.Role;
+import org.example.model.User;
+import org.example.model.Wallet;
+import org.example.model.WalletType;
+import org.example.repository.RoleRepository;
+import org.example.repository.UserRepository;
+import org.example.security.JwtUtils;
+import org.example.security.UserDetailsImpl;
+import org.example.service.PointsAccountService;
+import org.example.service.TwoFactorAuthService;
+import org.example.service.WalletService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:5173"}, maxAge = 3600)
+@RestController
+@RequestMapping("/api/auth")
+public class AuthController {
+    @Autowired
+    private AuthenticationManager authenticationManager;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private RoleRepository roleRepository;
+
+    @Autowired
+    private PasswordEncoder encoder;
+
+    @Autowired
+    private JwtUtils jwtUtils;
+
+    @Autowired
+    private WalletService walletService;
+
+    @Autowired
+    private PointsAccountService pointsAccountService;
+
+    @Autowired
+    private TwoFactorAuthService twoFactorAuthService;
+
+    @PostMapping("/signin")
+    public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
+        // Verify credentials without generating a token yet
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword()));
+
+        // Get user for 2FA verification
+        Optional<User> userOpt = userRepository.findByUsername(loginRequest.getUsername());
+        if (!userOpt.isPresent()) {
+            return ResponseEntity
+                    .badRequest()
+                    .body(new MessageResponse("Error: Usuario no encontrado."));
+        }
+
+        User user = userOpt.get();
+
+        // Check if user has already verified 2FA before
+        if (user.isTwoFactorVerified()) {
+            // User already verified, proceed with normal login
+            UserDetailsImpl userDetails = UserDetailsImpl.build(user);
+            Authentication auth = new UsernamePasswordAuthenticationToken(
+                    userDetails, null, userDetails.getAuthorities());
+
+            SecurityContextHolder.getContext().setAuthentication(auth);
+            String jwt = jwtUtils.generateJwtToken(auth);
+
+            List<String> roles = userDetails.getAuthorities().stream()
+                    .map(item -> item.getAuthority())
+                    .collect(Collectors.toList());
+
+            return ResponseEntity.ok(new JwtResponse(jwt,
+                    userDetails.getId(),
+                    userDetails.getUsername(),
+                    userDetails.getEmail(),
+                    roles));
+        } else {
+            // First time login, require 2FA
+            String email = user.getEmail();
+
+            // Generate 2FA token and get masked email
+            String maskedEmail = twoFactorAuthService.generateToken(loginRequest.getUsername(), email);
+
+            // Return success response indicating 2FA is required with masked email
+            MessageResponse response = new MessageResponse("Verification code required");
+            response.setMaskedEmail(maskedEmail);
+            return ResponseEntity.ok(response);
+        }
+    }
+
+    @PostMapping("/verify-token")
+    public ResponseEntity<?> verifyToken(@Valid @RequestBody VerifyTokenRequest verifyRequest) {
+        // Validate the token
+        boolean isValid = twoFactorAuthService.validateToken(verifyRequest.getUsername(), verifyRequest.getToken());
+
+        if (!isValid) {
+            return ResponseEntity
+                    .badRequest()
+                    .body(new MessageResponse("Error: Invalid or expired verification code"));
+        }
+
+        // Token is valid, proceed with authentication
+        User user = userRepository.findByUsername(verifyRequest.getUsername())
+                .orElseThrow(() -> new RuntimeException("Error: User not found."));
+
+        // Mark user as verified for future logins
+        user.setTwoFactorVerified(true);
+        userRepository.save(user);
+
+        // Create authentication object
+        UserDetailsImpl userDetails = UserDetailsImpl.build(user);
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                userDetails, null, userDetails.getAuthorities());
+
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+        String jwt = jwtUtils.generateJwtToken(authentication);
+
+        List<String> roles = userDetails.getAuthorities().stream()
+                .map(item -> item.getAuthority())
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(new JwtResponse(jwt,
+                userDetails.getId(),
+                userDetails.getUsername(),
+                userDetails.getEmail(),
+                roles));
+    }
+
+    @PostMapping("/signup")
+    public ResponseEntity<?> registerUser(@Valid @RequestBody SignupRequest signUpRequest) {
+        if (userRepository.existsByUsername(signUpRequest.getUsername())) {
+            return ResponseEntity
+                    .badRequest()
+                    .body(new MessageResponse("Error: ¡El nombre de usuario ya está en uso!"));
+        }
+
+        if (userRepository.existsByEmail(signUpRequest.getEmail())) {
+            return ResponseEntity
+                    .badRequest()
+                    .body(new MessageResponse("Error: ¡El email ya está en uso!"));
+        }
+
+        // Crear nueva cuenta de usuario
+        User user = new User();
+        user.setUsername(signUpRequest.getUsername());
+        user.setEmail(signUpRequest.getEmail());
+        user.setPassword(encoder.encode(signUpRequest.getPassword()));
+        user.setFirstName(signUpRequest.getFirstName());
+        user.setLastName(signUpRequest.getLastName());
+        user.setTwoFactorVerified(false); // Explícitamente establecer que el usuario necesita verificación
+
+        Set<String> strRoles = signUpRequest.getRoles();
+        Set<Role> roles = new HashSet<>();
+
+        if (strRoles == null) {
+            Role userRole = roleRepository.findByName(Role.ERole.ROLE_USER)
+                    .orElseThrow(() -> new RuntimeException("Error: Rol no encontrado."));
+            roles.add(userRole);
+        } else {
+            strRoles.forEach(role -> {
+                switch (role) {
+                    case "admin":
+                        Role adminRole = roleRepository.findByName(Role.ERole.ROLE_ADMIN)
+                                .orElseThrow(() -> new RuntimeException("Error: Rol no encontrado."));
+                        roles.add(adminRole);
+                        break;
+                    default:
+                        Role userRole = roleRepository.findByName(Role.ERole.ROLE_USER)
+                                .orElseThrow(() -> new RuntimeException("Error: Rol no encontrado."));
+                        roles.add(userRole);
+                }
+            });
+        }
+
+        user.setRoles(roles);
+        User savedUser = userRepository.save(user);
+
+        // Crear monedero principal
+        Wallet primaryWallet = new Wallet();
+        primaryWallet.setName("Monedero Principal");
+        primaryWallet.setDescription("Monedero principal para todas las transacciones");
+        primaryWallet.setWalletType(WalletType.PRIMARY);
+        primaryWallet.setUser(savedUser);
+        walletService.saveWallet(primaryWallet);
+
+        // Crear cuenta de puntos
+        PointsAccount pointsAccount = new PointsAccount();
+        pointsAccount.setUser(savedUser);
+        pointsAccountService.savePointsAccount(pointsAccount);
+
+        return ResponseEntity.ok(new MessageResponse("¡Usuario registrado exitosamente!"));
+    }
+}

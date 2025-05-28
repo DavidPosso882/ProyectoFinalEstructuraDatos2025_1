@@ -1,0 +1,357 @@
+import React, { ReactNode, useState } from 'react';
+import { 
+  Box, 
+  CssBaseline, 
+  Drawer, 
+  IconButton, 
+  List, 
+  ListItem, 
+  ListItemButton, 
+  ListItemIcon, 
+  ListItemText, 
+  Toolbar, 
+  Typography,
+  Divider,
+  Avatar,
+  Menu,
+  MenuItem,
+  Badge,
+  Tooltip,
+  useTheme,
+  styled,
+  alpha
+} from '@mui/material';
+import {
+  Menu as MenuIcon,
+  Dashboard as DashboardIcon,
+  AccountBalanceWallet as WalletIcon,
+  SwapHoriz as TransactionIcon,
+  EmojiEvents as PointsIcon,
+  Notifications as NotificationIcon,
+  Settings as SettingsIcon,
+  Logout as LogoutIcon,
+  Person as PersonIcon,
+} from '@mui/icons-material';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState } from '../../store';
+import { logout } from '../../store/slices/authSlice';
+import ThemeToggle from '../ThemeToggle';
+import NotificationPopover from '../NotificationPopover';
+
+const drawerWidth = 260;
+
+interface MainLayoutProps {
+  children: ReactNode;
+}
+
+// Componente estilizado para el logo
+const Logo = styled(Typography)(({ theme }) => ({
+  fontSize: '1.5rem',
+  fontWeight: 'bold',
+  color: theme.palette.common.white,
+  '& span': {
+    color: theme.palette.primary.main
+  }
+}));
+
+// Componente estilizado para los íconos de la barra lateral
+const SidebarIcon = styled(Box)(({ theme }) => ({
+  width: '1.25rem',
+  height: '1.25rem',
+  marginRight: '0.75rem',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center'
+}));
+
+// Componente estilizado para los botones de la barra lateral
+const SidebarButton = styled(ListItemButton, {
+  shouldForwardProp: (prop) => prop !== 'active'
+})<{ active?: boolean }>(({ theme, active }) => ({
+  padding: theme.spacing(1.5, 3),
+  borderRadius: theme.spacing(1),
+  marginBottom: theme.spacing(0.5),
+  transition: 'all 0.2s',
+  ...(active && {
+    backgroundColor: alpha(theme.palette.primary.main, 0.2),
+    color: theme.palette.common.white,
+    fontWeight: 600,
+    '&:hover': {
+      backgroundColor: alpha(theme.palette.primary.main, 0.3),
+    }
+  }),
+  ...(!active && {
+    color: alpha(theme.palette.common.white, 0.7),
+    '&:hover': {
+      backgroundColor: alpha(theme.palette.common.white, 0.1),
+      color: theme.palette.common.white,
+    }
+  })
+}));
+
+const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
+  const theme = useTheme();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const dispatch = useDispatch();
+  const { user } = useSelector((state: RootState) => state.auth);
+  
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [profileAnchorEl, setProfileAnchorEl] = useState<null | HTMLElement>(null);
+  const [notificationAnchorEl, setNotificationAnchorEl] = useState<null | HTMLElement>(null);
+  const [unreadNotifications, setUnreadNotifications] = useState(4); // Número de notificaciones sin leer
+
+  const handleDrawerToggle = () => {
+    setMobileOpen(!mobileOpen);
+  };
+
+  const handleProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setProfileAnchorEl(event.currentTarget);
+  };
+
+  const handleProfileMenuClose = () => {
+    setProfileAnchorEl(null);
+  };
+  
+  const handleNotificationClick = (event: React.MouseEvent<HTMLElement>) => {
+    setNotificationAnchorEl(event.currentTarget);
+  };
+  
+  const handleNotificationClose = () => {
+    setNotificationAnchorEl(null);
+  };
+
+  const handleLogout = () => {
+    dispatch(logout());
+    navigate('/login');
+  };
+
+  // Función para obtener la inicial del usuario
+  const getUserInitial = () => {
+    if (user?.firstName) {
+      return user.firstName.charAt(0).toUpperCase();
+    } else if (user?.lastName) {
+      return user.lastName.charAt(0).toUpperCase();
+    } else if (user?.email) {
+      return user.email.charAt(0).toUpperCase();
+    } else if (user?.username) {
+      return user.username.charAt(0).toUpperCase();
+    }
+    return 'U';
+  };
+
+  const menuItems = [
+    { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
+    { text: 'Transacciones', icon: <TransactionIcon />, path: '/transactions' },
+    { text: 'Monederos', icon: <WalletIcon />, path: '/wallets' },
+    { text: 'Puntos', icon: <PointsIcon />, path: '/points' },
+    { 
+      text: 'Notificaciones', 
+      icon: <Badge badgeContent={unreadNotifications} color="error"><NotificationIcon /></Badge>, 
+      path: '/notifications' 
+    },
+  ];
+
+  const drawer = (
+    <Box sx={{ 
+      height: '100%', 
+      display: 'flex', 
+      flexDirection: 'column',
+      bgcolor: theme.palette.mode === 'dark' ? 'background.paper' : 'grey.900'
+    }}>
+      <Toolbar sx={{ px: 3 }}>
+        <Logo>
+          Monedero<span>Virtual</span>
+        </Logo>
+      </Toolbar>
+      <Divider sx={{ bgcolor: alpha(theme.palette.common.white, 0.1) }} />
+      <Box sx={{ flexGrow: 1, p: 2 }}>
+        <List>
+          {menuItems.map((item) => (
+            <ListItem key={item.text} disablePadding>
+              <SidebarButton 
+                onClick={() => {
+                  navigate(item.path);
+                  if (mobileOpen) setMobileOpen(false);
+                }}
+                active={location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)}
+              >
+                <SidebarIcon>
+                  {item.icon}
+                </SidebarIcon>
+                <ListItemText 
+                  primary={item.text} 
+                  primaryTypographyProps={{ 
+                    fontWeight: location.pathname === item.path ? 600 : 400 
+                  }}
+                />
+              </SidebarButton>
+            </ListItem>
+          ))}
+        </List>
+      </Box>
+      <Divider sx={{ bgcolor: alpha(theme.palette.common.white, 0.1) }} />
+      <List sx={{ p: 2 }}>
+        <ListItem disablePadding>
+          <SidebarButton 
+            onClick={() => {
+              navigate('/settings');
+              if (mobileOpen) setMobileOpen(false);
+            }}
+            active={location.pathname === '/settings'}
+          >
+            <SidebarIcon>
+              <SettingsIcon />
+            </SidebarIcon>
+            <ListItemText primary="Configuración" />
+          </SidebarButton>
+        </ListItem>
+      </List>
+    </Box>
+  );
+
+  return (
+    <Box sx={{ display: 'flex' }}>
+      <CssBaseline />
+      <Box
+        component="nav"
+        sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
+      >
+        <Drawer
+          variant="temporary"
+          open={mobileOpen}
+          onClose={handleDrawerToggle}
+          ModalProps={{
+            keepMounted: true, // Better open performance on mobile.
+          }}
+          sx={{
+            display: { xs: 'block', sm: 'none' },
+            '& .MuiDrawer-paper': { 
+              boxSizing: 'border-box', 
+              width: drawerWidth,
+              bgcolor: theme.palette.mode === 'dark' ? 'background.paper' : 'grey.900'
+            },
+          }}
+        >
+          {drawer}
+        </Drawer>
+        <Drawer
+          variant="permanent"
+          sx={{
+            display: { xs: 'none', sm: 'block' },
+            '& .MuiDrawer-paper': { 
+              boxSizing: 'border-box', 
+              width: drawerWidth,
+              bgcolor: theme.palette.mode === 'dark' ? 'background.paper' : 'grey.900',
+              borderRight: `1px solid ${alpha(theme.palette.common.white, 0.1)}`
+            },
+          }}
+          open
+        >
+          {drawer}
+        </Drawer>
+      </Box>
+      <Box
+        component="main"
+        sx={{ 
+          flexGrow: 1, 
+          p: 3, 
+          width: { sm: `calc(100% - ${drawerWidth}px)` },
+          bgcolor: theme.palette.mode === 'dark' ? 'background.default' : 'grey.900',
+          minHeight: '100vh'
+        }}
+      >
+        <Toolbar sx={{ 
+          position: 'sticky', 
+          top: 0, 
+          zIndex: 10, 
+          bgcolor: theme.palette.mode === 'dark' ? 'background.default' : 'grey.900',
+          borderBottom: `1px solid ${alpha(theme.palette.common.white, 0.1)}`,
+          display: 'flex',
+          justifyContent: 'space-between'
+        }}>
+          <IconButton
+            color="inherit"
+            aria-label="open drawer"
+            edge="start"
+            onClick={handleDrawerToggle}
+            sx={{ mr: 2, display: { sm: 'none' } }}
+          >
+            <MenuIcon />
+          </IconButton>
+          
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            {/* Notification Icon */}
+            <Tooltip title="Notificaciones">
+              <IconButton 
+                color="inherit" 
+                onClick={handleNotificationClick}
+                sx={{ mr: 1 }}
+              >
+                <Badge badgeContent={unreadNotifications} color="error">
+                  <NotificationIcon />
+                </Badge>
+              </IconButton>
+            </Tooltip>
+            
+            {/* Notification Popover */}
+            <NotificationPopover 
+              anchorEl={notificationAnchorEl} 
+              onClose={handleNotificationClose} 
+            />
+            
+            {/* Theme Toggle Button */}
+            <ThemeToggle />
+            
+            <IconButton
+              size="large"
+              edge="end"
+              aria-label="account of current user"
+              aria-haspopup="true"
+              onClick={handleProfileMenuOpen}
+              color="inherit"
+              sx={{ ml: 1 }}
+            >
+              <Avatar sx={{ width: 32, height: 32 }}>
+                {getUserInitial()}
+              </Avatar>
+            </IconButton>
+            <Menu
+              anchorEl={profileAnchorEl}
+              open={Boolean(profileAnchorEl)}
+              onClose={handleProfileMenuClose}
+              transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+              anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+            >
+              <MenuItem onClick={() => { navigate('/profile'); handleProfileMenuClose(); }}>
+                <ListItemIcon>
+                  <PersonIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Perfil</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => { navigate('/settings'); handleProfileMenuClose(); }}>
+                <ListItemIcon>
+                  <SettingsIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Configuración</ListItemText>
+              </MenuItem>
+              <Divider />
+              <MenuItem onClick={handleLogout}>
+                <ListItemIcon>
+                  <LogoutIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Cerrar sesión</ListItemText>
+              </MenuItem>
+            </Menu>
+          </Box>
+        </Toolbar>
+        <Box sx={{ py: 2 }}>
+          {children}
+        </Box>
+      </Box>
+    </Box>
+  );
+};
+
+export default MainLayout;

@@ -1,0 +1,140 @@
+import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import ApiService from '../../services/api.service';
+import { API_ENDPOINTS } from '../../utils/api-config';
+
+interface Notification {
+  id: number;
+  userId: number;
+  message: string;
+  read: boolean;
+  createdAt: string;
+}
+
+interface NotificationState {
+  notifications: Notification[];
+  unreadCount: number;
+  loading: boolean;
+  error: string | null;
+}
+
+const initialState: NotificationState = {
+  notifications: [],
+  unreadCount: 0,
+  loading: false,
+  error: null,
+};
+
+// Thunks
+export const fetchNotifications = createAsyncThunk(
+  'notification/fetchNotifications',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await ApiService.get<Notification[]>(API_ENDPOINTS.NOTIFICATIONS.ALL);
+      return response;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message || 'Error al obtener notificaciones');
+    }
+  }
+);
+
+export const fetchUnreadNotifications = createAsyncThunk(
+  'notification/fetchUnreadNotifications',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await ApiService.get<Notification[]>(API_ENDPOINTS.NOTIFICATIONS.UNREAD);
+      return response;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message || 'Error al obtener notificaciones no leídas');
+    }
+  }
+);
+
+export const markNotificationAsRead = createAsyncThunk(
+  'notification/markNotificationAsRead',
+  async (notificationId: number, { rejectWithValue }) => {
+    try {
+      await ApiService.post(API_ENDPOINTS.NOTIFICATIONS.MARK_READ(notificationId));
+      return notificationId;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message || 'Error al marcar notificación como leída');
+    }
+  }
+);
+
+// Slice
+const notificationSlice = createSlice({
+  name: 'notification',
+  initialState,
+  reducers: {
+    clearNotificationError: (state) => {
+      state.error = null;
+    },
+  },
+  extraReducers: (builder) => {
+    // Fetch Notifications
+    builder.addCase(fetchNotifications.pending, (state) => {
+      state.loading = true;
+      state.error = null;
+    });
+    builder.addCase(fetchNotifications.fulfilled, (state, action: PayloadAction<any>) => {
+      state.loading = false;
+      // Asegurarse de que notifications sea un array
+      const notifications = Array.isArray(action.payload) ? action.payload : [];
+      state.notifications = notifications;
+      state.unreadCount = notifications.filter ? 
+        notifications.filter(notification => !notification.read).length : 0;
+    });
+    builder.addCase(fetchNotifications.rejected, (state, action) => {
+      state.loading = false;
+      state.error = action.payload as string;
+    });
+
+    // Fetch Unread Notifications
+    builder.addCase(fetchUnreadNotifications.pending, (state) => {
+      state.loading = true;
+      state.error = null;
+    });
+    builder.addCase(fetchUnreadNotifications.fulfilled, (state, action: PayloadAction<any>) => {
+      state.loading = false;
+      // Asegurarse de que notifications sea un array
+      const unreadNotifications = Array.isArray(action.payload) ? action.payload : [];
+      state.unreadCount = unreadNotifications.length;
+      
+      // Actualizar solo las notificaciones no leídas, manteniendo las leídas
+      if (unreadNotifications.length > 0 && Array.isArray(state.notifications)) {
+        const unreadIds = new Set(unreadNotifications.map(n => n.id));
+        const readNotifications = state.notifications.filter(n => n.read);
+        state.notifications = [...readNotifications, ...unreadNotifications];
+      }
+    });
+    builder.addCase(fetchUnreadNotifications.rejected, (state, action) => {
+      state.loading = false;
+      state.error = action.payload as string;
+    });
+
+    // Mark Notification as Read
+    builder.addCase(markNotificationAsRead.pending, (state) => {
+      state.loading = true;
+      state.error = null;
+    });
+    builder.addCase(markNotificationAsRead.fulfilled, (state, action: PayloadAction<number>) => {
+      state.loading = false;
+      const notificationId = action.payload;
+      if (Array.isArray(state.notifications)) {
+        state.notifications = state.notifications.map(notification => 
+          notification.id === notificationId 
+            ? { ...notification, read: true } 
+            : notification
+        );
+        state.unreadCount = state.notifications.filter(notification => !notification.read).length;
+      }
+    });
+    builder.addCase(markNotificationAsRead.rejected, (state, action) => {
+      state.loading = false;
+      state.error = action.payload as string;
+    });
+  },
+});
+
+export const { clearNotificationError } = notificationSlice.actions;
+export default notificationSlice.reducer;

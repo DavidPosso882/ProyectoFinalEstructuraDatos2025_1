@@ -1,0 +1,133 @@
+import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
+import { API_BASE_URL } from '../utils/api-config';
+
+// Lista de rutas públicas que no requieren autenticación
+const publicRoutes = [
+  '/api/auth/signin',
+  '/api/auth/signup',
+  '/swagger-ui',
+  '/v3/api-docs'
+];
+
+// Verificar si un token JWT es válido
+const isValidJWT = (token: string): boolean => {
+  // Un token JWT válido debe tener 3 partes separadas por puntos
+  const parts = token.split('.');
+  if (parts.length !== 3) {
+    return false;
+  }
+
+  // Intentar decodificar la parte del payload
+  try {
+    const payload = JSON.parse(atob(parts[1]));
+    
+    // Verificar si el token ha expirado
+    if (payload.exp && payload.exp * 1000 < Date.now()) {
+      return false;
+    }
+    
+    return true;
+  } catch (e) {
+    return false;
+  }
+};
+
+// Crear instancia de axios con la URL base
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Interceptor para añadir el token JWT a las peticiones
+apiClient.interceptors.request.use(
+  (config) => {
+    // Verificar si la ruta es pública
+    const isPublicRoute = publicRoutes.some(route => config.url?.includes(route));
+    
+    // Solo añadir el token si no es una ruta pública
+    if (!isPublicRoute) {
+      const token = localStorage.getItem('token');
+      
+      // Verificar que el token existe y es válido
+      if (token && isValidJWT(token) && config.headers) {
+        config.headers['Authorization'] = `Bearer ${token}`;
+      } else if (token && !isValidJWT(token)) {
+        // Si el token no es válido, eliminarlo
+        console.log('Eliminando token JWT inválido');
+        localStorage.removeItem('token');
+      }
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Interceptor para manejar errores de respuesta
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // Manejar errores de autenticación (401)
+    if (error.response && error.response.status === 401) {
+      // Solo redirigir al login si no estamos ya en la página de login o registro
+      const currentPath = window.location.pathname;
+      if (!currentPath.includes('/login') && !currentPath.includes('/register')) {
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+// Clase para manejar las peticiones a la API
+class ApiService {
+  // Método GET
+  static async get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
+    try {
+      const response: AxiosResponse<T> = await apiClient.get(url, config);
+      return response.data;
+    } catch (error) {
+      console.error(`Error en GET ${url}:`, error);
+      throw error;
+    }
+  }
+
+  // Método POST
+  static async post<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
+    try {
+      const response: AxiosResponse<T> = await apiClient.post(url, data, config);
+      return response.data;
+    } catch (error) {
+      console.error(`Error en POST ${url}:`, error);
+      throw error;
+    }
+  }
+
+  // Método PUT
+  static async put<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
+    try {
+      const response: AxiosResponse<T> = await apiClient.put(url, data, config);
+      return response.data;
+    } catch (error) {
+      console.error(`Error en PUT ${url}:`, error);
+      throw error;
+    }
+  }
+
+  // Método DELETE
+  static async delete<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
+    try {
+      const response: AxiosResponse<T> = await apiClient.delete(url, config);
+      return response.data;
+    } catch (error) {
+      console.error(`Error en DELETE ${url}:`, error);
+      throw error;
+    }
+  }
+}
+
+export default ApiService;

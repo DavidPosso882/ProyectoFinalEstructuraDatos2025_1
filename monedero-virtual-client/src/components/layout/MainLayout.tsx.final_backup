@@ -1,0 +1,501 @@
+import React, { ReactNode, useState } from 'react';
+import { 
+  AppBar, 
+  Box, 
+  CssBaseline, 
+  Drawer, 
+  IconButton, 
+  List, 
+  ListItem, 
+  ListItemButton, 
+  ListItemIcon, 
+  ListItemText, 
+  Toolbar, 
+  Typography,
+  Divider,
+  Avatar,
+  Menu,
+  MenuItem,
+  Collapse,
+  Badge,
+  Tooltip,
+  useTheme,
+  Chip,
+  ListSubheader
+} from '@mui/material';
+import {
+  Menu as MenuIcon,
+  Dashboard as DashboardIcon,
+  AccountBalanceWallet as WalletIcon,
+  SwapHoriz as TransactionIcon,
+  EmojiEvents as PointsIcon,
+  Notifications as NotificationIcon,
+  Settings as SettingsIcon,
+  Logout as LogoutIcon,
+  Person as PersonIcon,
+  ExpandLess,
+  ExpandMore,
+  Add as AddIcon,
+  Star as StarIcon,
+  StarBorder as StarBorderIcon,
+  TrendingUp as TrendingUpIcon,
+  TrendingDown as TrendingDownIcon,
+  Savings as SavingsIcon,
+  Payment as PaymentIcon,
+  History as HistoryIcon,
+  AccountBalance as InvestmentIcon,
+  Visibility as VisibilityIcon,
+  VisibilityOff as VisibilityOffIcon,
+  MoreHoriz as MoreIcon
+} from '@mui/icons-material';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState } from '../../store';
+import { logout } from '../../store/slices/authSlice';
+import ThemeToggle from '../ThemeToggle';
+import NotificationPopover from '../NotificationPopover';
+
+const drawerWidth = 260;
+
+interface MainLayoutProps {
+  children: ReactNode;
+}
+
+// Tipos para los monederos
+type WalletType = 'PRIMARY' | 'SAVINGS' | 'EXPENSES' | 'INVESTMENT' | 'CUSTOM';
+
+interface Wallet {
+  id: number;
+  name: string;
+  balance: number;
+  type: WalletType;
+  description: string;
+  isDefault?: boolean;
+  isFavorite?: boolean;
+}
+
+// Datos de ejemplo para desarrollo
+const mockWallets: Wallet[] = [
+  {
+    id: 1,
+    name: 'Principal',
+    balance: 2500.75,
+    type: 'PRIMARY',
+    description: 'Cuenta principal para gastos diarios',
+    isDefault: true,
+    isFavorite: true
+  },
+  {
+    id: 2,
+    name: 'Ahorros',
+    balance: 5000.00,
+    type: 'SAVINGS',
+    description: 'Ahorros a largo plazo',
+    isFavorite: false
+  },
+  {
+    id: 3,
+    name: 'Gastos',
+    balance: 750.25,
+    type: 'EXPENSES',
+    description: 'Gastos diarios y recurrentes',
+    isFavorite: true
+  },
+  {
+    id: 4,
+    name: 'Inversiones',
+    balance: 10000.00,
+    type: 'INVESTMENT',
+    description: 'Cartera de inversiones',
+    isFavorite: false
+  }
+];
+
+const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
+  const theme = useTheme();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const dispatch = useDispatch();
+  const { user } = useSelector((state: RootState) => state.auth);
+  
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [profileAnchorEl, setProfileAnchorEl] = useState<null | HTMLElement>(null);
+  const [notificationAnchorEl, setNotificationAnchorEl] = useState<null | HTMLElement>(null);
+  const [walletsOpen, setWalletsOpen] = useState(true);
+  const [wallets, setWallets] = useState<Wallet[]>(mockWallets);
+  const [showBalances, setShowBalances] = useState(true);
+  const [unreadNotifications, setUnreadNotifications] = useState(4); // Número de notificaciones sin leer
+
+  const handleDrawerToggle = () => {
+    setMobileOpen(!mobileOpen);
+  };
+
+  const handleProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setProfileAnchorEl(event.currentTarget);
+  };
+
+  const handleProfileMenuClose = () => {
+    setProfileAnchorEl(null);
+  };
+  
+  const handleNotificationClick = (event: React.MouseEvent<HTMLElement>) => {
+    setNotificationAnchorEl(event.currentTarget);
+  };
+  
+  const handleNotificationClose = () => {
+    setNotificationAnchorEl(null);
+  };
+
+  const handleLogout = () => {
+    dispatch(logout());
+    navigate('/login');
+  };
+
+  const handleWalletsClick = () => {
+    setWalletsOpen(!walletsOpen);
+  };
+
+  const handleToggleBalanceVisibility = () => {
+    setShowBalances(!showBalances);
+  };
+
+  // Función para obtener la inicial del usuario
+  const getUserInitial = () => {
+    if (user?.firstName) {
+      return user.firstName.charAt(0).toUpperCase();
+    } else if (user?.lastName) {
+      return user.lastName.charAt(0).toUpperCase();
+    } else if (user?.email) {
+      return user.email.charAt(0).toUpperCase();
+    } else if (user?.username) {
+      return user.username.charAt(0).toUpperCase();
+    }
+    return 'U';
+  };
+
+  // Función para obtener el icono según el tipo de monedero
+  const getIconForWalletType = (type: WalletType) => {
+    switch (type) {
+      case 'PRIMARY':
+        return <WalletIcon />;
+      case 'SAVINGS':
+        return <SavingsIcon />;
+      case 'EXPENSES':
+        return <PaymentIcon />;
+      case 'INVESTMENT':
+        return <InvestmentIcon />;
+      case 'CUSTOM':
+        return <WalletIcon />;
+      default:
+        return <WalletIcon />;
+    }
+  };
+
+  // Función para obtener el color según el tipo de monedero
+  const getColorForWalletType = (type: WalletType): string => {
+    switch (type) {
+      case 'PRIMARY':
+        return theme.palette.primary.main;
+      case 'SAVINGS':
+        return theme.palette.success.main;
+      case 'EXPENSES':
+        return theme.palette.warning.main;
+      case 'INVESTMENT':
+        return theme.palette.secondary.main;
+      case 'CUSTOM':
+        return theme.palette.info.main;
+      default:
+        return theme.palette.grey[500];
+    }
+  };
+
+  const menuItems = [
+    { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
+    { text: 'Transacciones', icon: <TransactionIcon />, path: '/transactions' },
+    { text: 'Puntos', icon: <PointsIcon />, path: '/points' },
+    { 
+      text: 'Notificaciones', 
+      icon: <Badge badgeContent={unreadNotifications} color="error"><NotificationIcon /></Badge>, 
+      path: '/notifications' 
+    },
+  ];
+
+  const drawer = (
+    <div>
+      <Toolbar>
+        <Typography variant="h6" noWrap component="div">
+          Monedero Virtual
+        </Typography>
+      </Toolbar>
+      <Divider />
+      <List>
+        {menuItems.map((item) => (
+          <ListItem key={item.text} disablePadding>
+            <ListItemButton 
+              onClick={() => navigate(item.path)}
+              selected={location.pathname === item.path}
+              sx={{
+                '&.Mui-selected': {
+                  backgroundColor: `${theme.palette.primary.main}20`,
+                  borderRight: `3px solid ${theme.palette.primary.main}`,
+                  '&:hover': {
+                    backgroundColor: `${theme.palette.primary.main}30`,
+                  }
+                }
+              }}
+            >
+              <ListItemIcon>
+                {item.icon}
+              </ListItemIcon>
+              <ListItemText primary={item.text} />
+            </ListItemButton>
+          </ListItem>
+        ))}
+
+        {/* Sección de Monederos con submenú */}
+        <ListItem disablePadding>
+          <ListItemButton 
+            onClick={handleWalletsClick}
+            selected={location.pathname === '/wallets' || location.pathname.startsWith('/wallets/')}
+            sx={{
+              '&.Mui-selected': {
+                backgroundColor: `${theme.palette.primary.main}20`,
+                borderRight: `3px solid ${theme.palette.primary.main}`,
+                '&:hover': {
+                  backgroundColor: `${theme.palette.primary.main}30`,
+                }
+              }
+            }}
+          >
+            <ListItemIcon>
+              <WalletIcon />
+            </ListItemIcon>
+            <ListItemText primary="Monederos" />
+            {walletsOpen ? <ExpandLess /> : <ExpandMore />}
+          </ListItemButton>
+        </ListItem>
+        
+        <Collapse in={walletsOpen} timeout="auto" unmountOnExit>
+          <List 
+            component="div" 
+            disablePadding
+            subheader={
+              <ListSubheader component="div" sx={{ bgcolor: 'transparent', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                Mis Monederos
+                <Box>
+                  <Tooltip title="Nuevo monedero">
+                    <IconButton size="small" onClick={() => navigate('/wallets?new=true')}>
+                      <AddIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title={showBalances ? "Ocultar balances" : "Mostrar balances"}>
+                    <IconButton size="small" onClick={handleToggleBalanceVisibility}>
+                      {showBalances ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              </ListSubheader>
+            }
+          >
+            {wallets.map((wallet) => (
+              <ListItem key={wallet.id} disablePadding>
+                <ListItemButton 
+                  sx={{ pl: 4 }}
+                  onClick={() => navigate(`/wallets/${wallet.id}`)}
+                  selected={location.pathname === `/wallets/${wallet.id}`}
+                >
+                  <ListItemIcon>
+                    <Avatar 
+                      sx={{ 
+                        width: 28, 
+                        height: 28, 
+                        bgcolor: getColorForWalletType(wallet.type),
+                        fontSize: '0.875rem'
+                      }}
+                    >
+                      {getIconForWalletType(wallet.type)}
+                    </Avatar>
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary={
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <Typography variant="body2" noWrap sx={{ maxWidth: 100 }}>
+                          {wallet.name}
+                        </Typography>
+                        {wallet.isFavorite && (
+                          <StarIcon sx={{ ml: 0.5, fontSize: '0.875rem', color: theme.palette.warning.main }} />
+                        )}
+                      </Box>
+                    } 
+                    secondary={
+                      <Typography variant="caption" color="textSecondary">
+                        {showBalances ? `$${wallet.balance.toFixed(2)}` : '••••••'}
+                      </Typography>
+                    }
+                  />
+                </ListItemButton>
+              </ListItem>
+            ))}
+            
+            <ListItem disablePadding>
+              <ListItemButton 
+                sx={{ pl: 4 }}
+                onClick={() => navigate('/wallets')}
+              >
+                <ListItemIcon>
+                  <MoreIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText primary="Ver todos" />
+              </ListItemButton>
+            </ListItem>
+          </List>
+        </Collapse>
+      </List>
+      
+      <Divider sx={{ mt: 2, mb: 2 }} />
+      
+      <List>
+        <ListItem disablePadding>
+          <ListItemButton 
+            onClick={() => navigate('/settings')}
+            selected={location.pathname === '/settings'}
+          >
+            <ListItemIcon>
+              <SettingsIcon />
+            </ListItemIcon>
+            <ListItemText primary="Configuración" />
+          </ListItemButton>
+        </ListItem>
+      </List>
+    </div>
+  );
+
+  return (
+    <Box sx={{ display: 'flex' }}>
+      <CssBaseline />
+      <AppBar
+        position="fixed"
+        sx={{
+          width: { sm: `calc(100% - ${drawerWidth}px)` },
+          ml: { sm: `${drawerWidth}px` },
+        }}
+      >
+        <Toolbar>
+          <IconButton
+            color="inherit"
+            aria-label="open drawer"
+            edge="start"
+            onClick={handleDrawerToggle}
+            sx={{ mr: 2, display: { sm: 'none' } }}
+          >
+            <MenuIcon />
+          </IconButton>
+          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
+            Monedero Virtual
+          </Typography>
+          
+          {/* Notification Icon */}
+          <Tooltip title="Notificaciones">
+            <IconButton 
+              color="inherit" 
+              onClick={handleNotificationClick}
+              sx={{ mr: 1 }}
+            >
+              <Badge badgeContent={unreadNotifications} color="error">
+                <NotificationIcon />
+              </Badge>
+            </IconButton>
+          </Tooltip>
+          
+          {/* Notification Popover */}
+          <NotificationPopover 
+            anchorEl={notificationAnchorEl} 
+            onClose={handleNotificationClose} 
+          />
+          
+          {/* Theme Toggle Button */}
+          <ThemeToggle />
+          
+          <IconButton
+            size="large"
+            edge="end"
+            aria-label="account of current user"
+            aria-haspopup="true"
+            onClick={handleProfileMenuOpen}
+            color="inherit"
+            sx={{ ml: 1 }}
+          >
+            <Avatar sx={{ width: 32, height: 32 }}>
+              {getUserInitial()}
+            </Avatar>
+          </IconButton>
+          <Menu
+            anchorEl={profileAnchorEl}
+            open={Boolean(profileAnchorEl)}
+            onClose={handleProfileMenuClose}
+            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+          >
+            <MenuItem onClick={() => { navigate('/profile'); handleProfileMenuClose(); }}>
+              <ListItemIcon>
+                <PersonIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Perfil</ListItemText>
+            </MenuItem>
+            <MenuItem onClick={() => { navigate('/settings'); handleProfileMenuClose(); }}>
+              <ListItemIcon>
+                <SettingsIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Configuración</ListItemText>
+            </MenuItem>
+            <Divider />
+            <MenuItem onClick={handleLogout}>
+              <ListItemIcon>
+                <LogoutIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Cerrar sesión</ListItemText>
+            </MenuItem>
+          </Menu>
+        </Toolbar>
+      </AppBar>
+      <Box
+        component="nav"
+        sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
+      >
+        <Drawer
+          variant="temporary"
+          open={mobileOpen}
+          onClose={handleDrawerToggle}
+          ModalProps={{
+            keepMounted: true, // Better open performance on mobile.
+          }}
+          sx={{
+            display: { xs: 'block', sm: 'none' },
+            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+          }}
+        >
+          {drawer}
+        </Drawer>
+        <Drawer
+          variant="permanent"
+          sx={{
+            display: { xs: 'none', sm: 'block' },
+            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+          }}
+          open
+        >
+          {drawer}
+        </Drawer>
+      </Box>
+      <Box
+        component="main"
+        sx={{ flexGrow: 1, p: 3, width: { sm: `calc(100% - ${drawerWidth}px)` } }}
+      >
+        <Toolbar />
+        {children}
+      </Box>
+    </Box>
+  );
+};
+
+export default MainLayout;

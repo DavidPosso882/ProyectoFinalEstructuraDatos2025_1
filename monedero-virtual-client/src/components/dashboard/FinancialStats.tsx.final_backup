@@ -1,0 +1,186 @@
+import React from 'react';
+import { 
+  Box, 
+  Typography, 
+  Grid,
+  LinearProgress,
+  useTheme
+} from '@mui/material';
+import {
+  TrendingUp as TrendingUpIcon,
+  TrendingDown as TrendingDownIcon,
+  AccountBalanceWallet as WalletIcon,
+  ShoppingCart as ShoppingCartIcon,
+  CalendarToday as CalendarIcon
+} from '@mui/icons-material';
+import SummaryCard from './SummaryCard';
+
+interface FinancialStatsProps {
+  totalBalance: number;
+  totalIncome: number;
+  totalExpenses: number;
+  expenseRatio: number;
+  topCategory: string;
+  topCategoryAmount: number;
+  upcomingTransaction: {
+    date: string;
+    description: string;
+    amount: number;
+  };
+}
+
+const FinancialStats: React.FC<FinancialStatsProps> = ({
+  totalBalance,
+  totalIncome,
+  totalExpenses,
+  expenseRatio,
+  topCategory,
+  topCategoryAmount,
+  upcomingTransaction
+}) => {
+  const theme = useTheme();
+  
+  // Determinar el color del ratio de gastos
+  const getRatioColor = (ratio: number) => {
+    if (ratio < 50) return theme.palette.success.main;
+    if (ratio < 80) return theme.palette.warning.main;
+    return theme.palette.error.main;
+  };
+  
+  return (
+    <Grid container spacing={2}>
+      {/* Balance Total */}
+      <Grid item xs={12} md={6}>
+        <SummaryCard 
+          icon={<WalletIcon />} 
+          iconColor={theme.palette.primary.main}
+          fullWidth
+        >
+          <Box sx={{ textAlign: 'center', mt: 1 }}>
+            <Typography variant="h3" component="p" sx={{ fontWeight: 'bold', color: theme.palette.primary.main }}>
+              ${totalBalance.toFixed(2)}
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              Balance Total
+            </Typography>
+          </Box>
+        </SummaryCard>
+      </Grid>
+      
+      {/* Ingresos */}
+      <Grid item xs={12} sm={6} md={3}>
+        <SummaryCard 
+          title="Ingresos (30 días)"
+          icon={<TrendingUpIcon />}
+          iconColor={theme.palette.success.main}
+        >
+          <Typography variant="h5" component="p" sx={{ fontWeight: 'semibold', color: theme.palette.success.main, mt: 1 }}>
+            +${totalIncome.toFixed(2)}
+          </Typography>
+        </SummaryCard>
+      </Grid>
+      
+      {/* Gastos */}
+      <Grid item xs={12} sm={6} md={3}>
+        <SummaryCard 
+          title="Gastos (30 días)"
+          icon={<TrendingDownIcon />}
+          iconColor={theme.palette.error.main}
+        >
+          <Typography variant="h5" component="p" sx={{ fontWeight: 'semibold', color: theme.palette.error.main, mt: 1 }}>
+            -${totalExpenses.toFixed(2)}
+          </Typography>
+        </SummaryCard>
+      </Grid>
+      
+      {/* Ratio Gastos vs Ingresos */}
+      <Grid item xs={12} sm={6} md={3}>
+        <SummaryCard title="Ratio Gastos vs Ingresos">
+          <Box sx={{ mt: 1 }}>
+            <LinearProgress 
+              variant="determinate" 
+              value={expenseRatio} 
+              sx={{
+                height: 8,
+                borderRadius: 4,
+                bgcolor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)',
+                '& .MuiLinearProgress-bar': {
+                  bgcolor: getRatioColor(expenseRatio)
+                },
+                mb: 0.5
+              }}
+            />
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                textAlign: 'right', 
+                fontWeight: 'medium',
+                color: getRatioColor(expenseRatio)
+              }}
+            >
+              {expenseRatio}%
+            </Typography>
+          </Box>
+        </SummaryCard>
+      </Grid>
+      
+      {/* Categoría Principal Gasto */}
+      <Grid item xs={12} sm={6} md={3}>
+        <SummaryCard title="Categoría Principal Gasto">
+          <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+            <Box 
+              sx={{ 
+                mr: 1.5, 
+                color: theme.palette.secondary.main,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.5rem'
+              }}
+            >
+              <ShoppingCartIcon />
+            </Box>
+            <Box>
+              <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
+                {topCategory}
+              </Typography>
+              <Typography variant="body2" color="textSecondary">
+                ${topCategoryAmount.toFixed(2)}
+              </Typography>
+            </Box>
+          </Box>
+        </SummaryCard>
+      </Grid>
+      
+      {/* Próxima Transacción */}
+      <Grid item xs={12} sm={6} md={3}>
+        <SummaryCard title="Próxima Transacción">
+          <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+            <Box 
+              sx={{ 
+                mr: 1.5, 
+                color: theme.palette.info.main,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.5rem'
+              }}
+            >
+              <CalendarIcon />
+            </Box>
+            <Box>
+              <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                {upcomingTransaction.description}
+              </Typography>
+              <Typography variant="caption" color="textSecondary">
+                {upcomingTransaction.date} - ${Math.abs(upcomingTransaction.amount).toFixed(2)}
+              </Typography>
+            </Box>
+          </Box>
+        </SummaryCard>
+      </Grid>
+    </Grid>
+  );
+};
+
+export default FinancialStats;

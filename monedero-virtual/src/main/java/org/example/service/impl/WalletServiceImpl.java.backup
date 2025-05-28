@@ -1,0 +1,157 @@
+package org.example.service.impl;
+
+import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.map.IMap;
+import jakarta.persistence.EntityNotFoundException;
+import org.example.dto.request.WalletRequest;
+import org.example.dto.response.WalletResponse;
+import org.example.model.User;
+import org.example.model.Wallet;
+import org.example.repository.UserRepository;
+import org.example.repository.WalletRepository;
+import org.example.service.WalletService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Service
+public class WalletServiceImpl implements WalletService {
+
+    @Autowired
+    private WalletRepository walletRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private HazelcastInstance hazelcastInstance;
+
+    @Autowired
+    private HazelcastTransactionManager transactionManager;
+
+    @Override
+    @Cacheable(value = "userWallets", key = "#userId")
+    public List<WalletResponse> getUserWallets(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
+
+        return walletRepository.findByUser(user).stream()
+                .map(this::convertToWalletResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Cacheable(value = "wallets", key = "#walletId")
+    public WalletResponse getWalletById(Long walletId, Long userId) {
+        Wallet wallet = walletRepository.findById(walletId)
+                .orElseThrow(() -> new EntityNotFoundException("Monedero no encontrado"));
+
+        if (!wallet.getUser().getId().equals(userId)) {
+            throw new AccessDeniedException("No tienes permiso para acceder a este monedero");
+        }
+
+        return convertToWalletResponse(wallet);
+    }
+
+    @Override
+    @Transactional
+    @CacheEvict(value = {"userWallets", "walletBalances"}, key = "#userId")
+    public WalletResponse createWallet(WalletRequest walletRequest, Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
+
+        Wallet wallet = new Wallet();
+        wallet.setName(walletRequest.getName());
+        wallet.setDescription(walletRequest.getDescription());
+        wallet.setWalletType(walletRequest.getWalletType());
+        wallet.setBalance(BigDecimal.ZERO);
+        wallet.setUser(user);
+
+        Wallet savedWallet = walletRepository.save(wallet);
+        return convertToWalletResponse(savedWallet);
+    }
+
+    @Override
+    @Transactional
+    @CacheEvict(value = {"userWallets", "wallets", "walletBalances"}, allEntries = true)
+    public void deleteWallet(Long walletId, Long userId) {
+        Wallet wallet = walletRepository.findById(walletId)
+                .orElseThrow(() -> new EntityNotFoundException("Monedero no encontrado"));
+
+        if (!wallet.getUser().getId().equals(userId)) {
+            throw new AccessDeniedException("No tienes permiso para eliminar este monedero");
+        }
+
+        if (wallet.getBalance().compareTo(BigDecimal.ZERO) > 0) {
+            throw new IllegalStateException("No puedes eliminar un monedero con saldo positivo");
+        }
+
+        walletRepository.delete(wallet);
+    }
+
+    @Override
+    @Transactional
+    @CacheEvict(value = {"wallets", "walletBalances"}, key = "#walletId")
+    public Wallet updateWalletBalance(Long walletId, BigDecimal amount) {
+        Wallet wallet = walletRepository.findById(walletId)
+                .orElseThrow(() -> new EntityNotFoundException("Monedero no encontrado"));
+
+        wallet.updateBalance(amount);
+
+        // Actualizar el saldo en Hazelcast
+        IMap<String, BigDecimal> walletBalances = hazelcastInstance.getMap("walletBalances");
+        walletBalances.put("wallet:" + walletId, wallet.getBalance());
+
+        return walletRepository.save(wallet);
+    }
+
+    @Override
+    public boolean hasWalletSufficientBalance(Long walletId, BigDecimal amount) {
+        // Primero intentar verificar en Hazelcast
+        boolean hasSufficientBalance = transactionManager.hasWalletSufficientBalance(walletId, amount);
+
+        if (hasSufficientBalance) {
+            return true;
+        }
+
+        // Si no está en caché o no hay saldo suficiente, verificar en la base de datos
+        Wallet wallet = walletRepository.findById(walletId)
+                .orElseThrow(() -> new EntityNotFoundException("Monedero no encontrado"));
+
+        boolean result = wallet.hasSufficientBalance(amount);
+
+        // Actualizar la caché
+        if (result) {
+            IMap<String, BigDecimal> walletBalances = hazelcastInstance.getMap("walletBalances");
+            walletBalances.put("wallet:" + walletId, wallet.getBalance());
+        }
+
+        return result;
+    }
+
+    @Override
+    @Transactional
+    public Wallet saveWallet(Wallet wallet) {
+        return walletRepository.save(wallet);
+    }
+
+    @Override
+    public WalletResponse convertToWalletResponse(Wallet wallet) {
+        WalletResponse response = new WalletResponse();
+        response.setId(wallet.getId());
+        response.setName(wallet.getName());
+        response.setDescription(wallet.getDescription());
+        response.setBalance(wallet.getBalance());
+        response.setWalletType(wallet.getWalletType());
+        response.setCreatedAt(wallet.getCreatedAt());
+        response.setUpdatedAt(wallet.getUpdatedAt());
+        return response;
+    }
+}

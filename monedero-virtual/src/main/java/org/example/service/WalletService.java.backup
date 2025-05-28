@@ -1,0 +1,71 @@
+package org.example.service;
+
+import org.example.dto.request.WalletRequest;
+import org.example.dto.response.WalletResponse;
+import org.example.model.Wallet;
+
+import java.math.BigDecimal;
+import java.util.List;
+
+public interface WalletService {
+    
+    /**
+     * Obtiene todos los monederos de un usuario
+     * @param userId ID del usuario
+     * @return Lista de monederos
+     */
+    List<WalletResponse> getUserWallets(Long userId);
+    
+    /**
+     * Obtiene un monedero por su ID
+     * @param walletId ID del monedero
+     * @param userId ID del usuario propietario
+     * @return Monedero encontrado
+     */
+    WalletResponse getWalletById(Long walletId, Long userId);
+    
+    /**
+     * Crea un nuevo monedero para un usuario
+     * @param walletRequest Datos del monedero
+     * @param userId ID del usuario propietario
+     * @return Monedero creado
+     */
+    WalletResponse createWallet(WalletRequest walletRequest, Long userId);
+    
+    /**
+     * Elimina un monedero
+     * @param walletId ID del monedero
+     * @param userId ID del usuario propietario
+     */
+    void deleteWallet(Long walletId, Long userId);
+    
+    /**
+     * Actualiza el saldo de un monedero
+     * @param walletId ID del monedero
+     * @param amount Cantidad a añadir (positiva) o restar (negativa)
+     * @return Monedero actualizado
+     */
+    Wallet updateWalletBalance(Long walletId, BigDecimal amount);
+    
+    /**
+     * Verifica si un monedero tiene saldo suficiente
+     * @param walletId ID del monedero
+     * @param amount Cantidad a verificar
+     * @return true si hay saldo suficiente, false en caso contrario
+     */
+    boolean hasWalletSufficientBalance(Long walletId, BigDecimal amount);
+    
+    /**
+     * Guarda un monedero
+     * @param wallet Monedero a guardar
+     * @return Monedero guardado
+     */
+    Wallet saveWallet(Wallet wallet);
+    
+    /**
+     * Convierte un objeto Wallet a WalletResponse
+     * @param wallet Monedero a convertir
+     * @return WalletResponse
+     */
+    WalletResponse convertToWalletResponse(Wallet wallet);
+}

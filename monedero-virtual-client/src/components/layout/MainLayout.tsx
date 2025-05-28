@@ -1,0 +1,389 @@
+import React, { ReactNode, useState, useEffect } from 'react';
+import {
+  Box,
+  CssBaseline,
+  Drawer,
+  IconButton,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Toolbar,
+  Typography,
+  Divider,
+  Avatar,
+  Menu,
+  MenuItem,
+  Badge,
+  Tooltip,
+  useTheme,
+  styled,
+  alpha
+} from '@mui/material';
+import {
+  Menu as MenuIcon,
+  Dashboard as DashboardIcon,
+  AccountBalanceWallet as WalletIcon,
+  SwapHoriz as TransactionIcon,
+  EmojiEvents as PointsIcon,
+  Notifications as NotificationIcon,
+  Settings as SettingsIcon,
+  Logout as LogoutIcon,
+  Person as PersonIcon,
+  BarChart as AnalysisIcon,
+  CalendarMonth as CalendarIcon
+} from '@mui/icons-material';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState, AppDispatch } from '../../store';
+import { logout } from '../../store/slices/authSlice';
+import { fetchUnreadNotifications, fetchUnreadNotificationsCount } from '../../store/slices/notificationSlice';
+import ThemeToggle from '../ThemeToggle';
+
+const drawerWidth = 260;
+
+interface MainLayoutProps {
+  children: ReactNode;
+}
+
+// Componente estilizado para el logo
+const Logo = styled(Typography)(({ theme }) => ({
+  fontSize: '1.5rem',
+  fontWeight: 'bold',
+  color: theme.palette.mode === 'dark' ? theme.palette.common.white : theme.palette.primary.main,
+  '& span': {
+    color: theme.palette.primary.main
+  }
+}));
+
+// Componente estilizado para los íconos de la barra lateral
+const SidebarIcon = styled(Box)(({ theme }) => ({
+  width: '1.25rem',
+  height: '1.25rem',
+  marginRight: '0.75rem',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center'
+}));
+
+// Componente estilizado para los botones de la barra lateral
+const SidebarButton = styled(ListItemButton, {
+  shouldForwardProp: (prop) => prop !== 'active'
+})<{ active?: boolean }>(({ theme, active }) => ({
+  padding: theme.spacing(1.5, 3),
+  borderRadius: theme.spacing(1),
+  marginBottom: theme.spacing(0.5),
+  transition: 'all 0.2s',
+  ...(active && {
+    backgroundColor: alpha(theme.palette.primary.main, 0.2),
+    color: theme.palette.mode === 'dark' ? theme.palette.common.white : theme.palette.primary.main,
+    fontWeight: 600,
+    '&:hover': {
+      backgroundColor: alpha(theme.palette.primary.main, 0.3),
+    }
+  }),
+  ...(!active && {
+    color: theme.palette.mode === 'dark'
+      ? alpha(theme.palette.common.white, 0.7)
+      : theme.palette.text.primary,
+    '&:hover': {
+      backgroundColor: theme.palette.mode === 'dark'
+        ? alpha(theme.palette.common.white, 0.1)
+        : alpha(theme.palette.primary.main, 0.1),
+      color: theme.palette.mode === 'dark'
+        ? theme.palette.common.white
+        : theme.palette.primary.main,
+    }
+  })
+}));
+
+const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
+  const theme = useTheme();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const dispatch = useDispatch<AppDispatch>();
+  const { user } = useSelector((state: RootState) => state.auth);
+
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [profileAnchorEl, setProfileAnchorEl] = useState<null | HTMLElement>(null);
+
+
+  // Obtener el contador de notificaciones no leídas desde Redux
+  const { unreadCount } = useSelector((state: RootState) => state.notification);
+
+  // Cargar notificaciones no leídas al montar el componente y configurar polling
+  useEffect(() => {
+    if (user) {
+      // Cargar inmediatamente
+      dispatch(fetchUnreadNotifications());
+
+      // Configurar polling adaptativo basado en la visibilidad de la ventana
+      let pollInterval: NodeJS.Timeout;
+
+      const startPolling = () => {
+        // Polling más frecuente cuando la ventana está activa (15 segundos)
+        // Polling menos frecuente cuando está inactiva (60 segundos)
+        const interval = document.hidden ? 60000 : 15000;
+
+        clearInterval(pollInterval);
+        pollInterval = setInterval(() => {
+          // Usar el endpoint optimizado que solo devuelve el contador
+          dispatch(fetchUnreadNotificationsCount());
+        }, interval);
+      };
+
+      // Iniciar polling
+      startPolling();
+
+      // Escuchar cambios de visibilidad de la ventana
+      const handleVisibilityChange = () => {
+        startPolling();
+        // Si la ventana se vuelve visible, cargar inmediatamente
+        if (!document.hidden) {
+          dispatch(fetchUnreadNotificationsCount());
+        }
+      };
+
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+
+      // Limpiar el intervalo y el listener cuando el componente se desmonte o el usuario cambie
+      return () => {
+        clearInterval(pollInterval);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
+    }
+  }, [dispatch, user]);
+
+  const handleDrawerToggle = () => {
+    setMobileOpen(!mobileOpen);
+  };
+
+  const handleProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setProfileAnchorEl(event.currentTarget);
+  };
+
+  const handleProfileMenuClose = () => {
+    setProfileAnchorEl(null);
+  };
+
+
+
+  const handleLogout = () => {
+    dispatch(logout());
+    navigate('/login');
+  };
+
+  // Función para obtener la inicial del usuario
+  const getUserInitial = () => {
+    if (user?.firstName) {
+      return user.firstName.charAt(0).toUpperCase();
+    } else if (user?.lastName) {
+      return user.lastName.charAt(0).toUpperCase();
+    } else if (user?.email) {
+      return user.email.charAt(0).toUpperCase();
+    } else if (user?.username) {
+      return user.username.charAt(0).toUpperCase();
+    }
+    return 'U';
+  };
+
+  const menuItems = [
+    { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
+    { text: 'Transacciones', icon: <TransactionIcon />, path: '/transactions' },
+    { text: 'Monederos', icon: <WalletIcon />, path: '/wallets' },
+    { text: 'Pagos Programados', icon: <CalendarIcon />, path: '/scheduled-transactions' },
+    { text: 'Análisis de Gastos', icon: <AnalysisIcon />, path: '/analysis' },
+    { text: 'Puntos', icon: <PointsIcon />, path: '/points' },
+    {
+      text: 'Notificaciones',
+      icon: <Badge badgeContent={unreadCount} color="error"><NotificationIcon /></Badge>,
+      path: '/notifications'
+    },
+  ];
+
+  const drawer = (
+    <Box sx={{
+      height: '100%',
+      display: 'flex',
+      flexDirection: 'column',
+      bgcolor: theme.palette.background.paper
+    }}>
+      <Toolbar sx={{ px: 3 }}>
+        <Logo>
+          Monedero<span>Virtual</span>
+        </Logo>
+      </Toolbar>
+      <Divider sx={{
+        bgcolor: theme.palette.mode === 'dark'
+          ? alpha(theme.palette.common.white, 0.1)
+          : alpha(theme.palette.common.black, 0.1)
+      }} />
+      <Box sx={{ flexGrow: 1, p: 2 }}>
+        <List>
+          {menuItems.map((item) => (
+            <ListItem key={item.text} disablePadding>
+              <SidebarButton
+                onClick={() => {
+                  navigate(item.path);
+                  if (mobileOpen) setMobileOpen(false);
+                }}
+                active={location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)}
+              >
+                <SidebarIcon>
+                  {item.icon}
+                </SidebarIcon>
+                <ListItemText
+                  primary={item.text}
+                  primaryTypographyProps={{
+                    fontWeight: location.pathname === item.path ? 600 : 400
+                  }}
+                />
+              </SidebarButton>
+            </ListItem>
+          ))}
+        </List>
+      </Box>
+      <Divider sx={{
+        bgcolor: theme.palette.mode === 'dark'
+          ? alpha(theme.palette.common.white, 0.1)
+          : alpha(theme.palette.common.black, 0.1)
+      }} />
+      <List sx={{ p: 2 }}>
+        <ListItem disablePadding>
+          <SidebarButton
+            onClick={() => {
+              navigate('/settings');
+              if (mobileOpen) setMobileOpen(false);
+            }}
+            active={location.pathname === '/settings'}
+          >
+            <SidebarIcon>
+              <SettingsIcon />
+            </SidebarIcon>
+            <ListItemText primary="Configuración" />
+          </SidebarButton>
+        </ListItem>
+      </List>
+    </Box>
+  );
+
+  return (
+    <Box sx={{ display: 'flex' }}>
+      <CssBaseline />
+      <Box
+        component="nav"
+        sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
+      >
+        <Drawer
+          variant="temporary"
+          open={mobileOpen}
+          onClose={handleDrawerToggle}
+          ModalProps={{
+            keepMounted: true, // Better open performance on mobile.
+          }}
+          sx={{
+            display: { xs: 'block', sm: 'none' },
+            '& .MuiDrawer-paper': {
+              boxSizing: 'border-box',
+              width: drawerWidth,
+              bgcolor: theme.palette.background.paper
+            },
+          }}
+        >
+          {drawer}
+        </Drawer>
+        <Drawer
+          variant="permanent"
+          sx={{
+            display: { xs: 'none', sm: 'block' },
+            '& .MuiDrawer-paper': {
+              boxSizing: 'border-box',
+              width: drawerWidth,
+              bgcolor: theme.palette.background.paper,
+              borderRight: `1px solid ${
+                theme.palette.mode === 'dark'
+                  ? alpha(theme.palette.common.white, 0.1)
+                  : alpha(theme.palette.common.black, 0.1)
+              }`
+            },
+          }}
+          open
+        >
+          {drawer}
+        </Drawer>
+      </Box>
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          p: 3,
+          width: { sm: `calc(100% - ${drawerWidth}px)` },
+          bgcolor: theme.palette.background.default,
+          minHeight: '100vh'
+        }}
+      >
+        <Toolbar sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          mb: 2
+        }}>
+          <IconButton
+            color="inherit"
+            aria-label="open drawer"
+            edge="start"
+            onClick={handleDrawerToggle}
+            sx={{ mr: 2, display: { sm: 'none' } }}
+          >
+            <MenuIcon />
+          </IconButton>
+
+          <Box sx={{ display: 'flex', alignItems: 'center', ml: 'auto' }}>
+            {/* Theme Toggle Button */}
+            <ThemeToggle />
+
+            <IconButton
+              size="large"
+              edge="end"
+              aria-label="account of current user"
+              aria-haspopup="true"
+              onClick={handleProfileMenuOpen}
+              color="inherit"
+              sx={{ ml: 1 }}
+            >
+              <Avatar sx={{ width: 32, height: 32 }}>
+                {getUserInitial()}
+              </Avatar>
+            </IconButton>
+            <Menu
+              anchorEl={profileAnchorEl}
+              open={Boolean(profileAnchorEl)}
+              onClose={handleProfileMenuClose}
+              transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+              anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+            >
+              <MenuItem onClick={() => { navigate('/profile'); handleProfileMenuClose(); }}>
+                <ListItemIcon>
+                  <PersonIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Perfil</ListItemText>
+              </MenuItem>
+              <Divider />
+              <MenuItem onClick={handleLogout}>
+                <ListItemIcon>
+                  <LogoutIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Cerrar sesión</ListItemText>
+              </MenuItem>
+            </Menu>
+          </Box>
+        </Toolbar>
+        <Box>
+          {children}
+        </Box>
+      </Box>
+    </Box>
+  );
+};
+
+export default MainLayout;

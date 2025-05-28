@@ -1,0 +1,449 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  Box,
+  TextField,
+  Button,
+  Typography,
+  Paper,
+  CircularProgress,
+  Alert,
+  InputAdornment,
+  IconButton,
+  useTheme,
+  Fade,
+  Grow,
+  Zoom,
+  Divider
+} from '@mui/material';
+import { 
+  Email as EmailIcon,
+  LockOutlined as LockIcon,
+  Refresh as RefreshIcon,
+  ArrowBack as ArrowBackIcon,
+  CheckCircleOutline as CheckIcon
+} from '@mui/icons-material';
+
+interface TwoFactorAuthProps {
+  username: string;
+  maskedEmail?: string | null;
+  onVerify: (token: string) => void;
+  onCancel: () => void;
+  error?: string;
+  loading?: boolean;
+}
+
+const TwoFactorAuth: React.FC<TwoFactorAuthProps> = ({
+  username,
+  maskedEmail,
+  onVerify,
+  onCancel,
+  error,
+  loading = false
+}) => {
+  const theme = useTheme();
+  const [token, setToken] = useState('');
+  const [timeLeft, setTimeLeft] = useState(300); // 5 minutes in seconds
+  const [tokenError, setTokenError] = useState('');
+  const [digitValues, setDigitValues] = useState(['', '', '', '', '', '']);
+  const [activeDigit, setActiveDigit] = useState(0);
+  
+  // Create refs for each input field
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  
+  // Initialize refs array
+  useEffect(() => {
+    inputRefs.current = inputRefs.current.slice(0, 6);
+  }, []);
+
+  // Timer for token expiration
+  useEffect(() => {
+    if (timeLeft <= 0) return;
+
+    const timer = setInterval(() => {
+      setTimeLeft(prevTime => prevTime - 1);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [timeLeft]);
+
+  // Auto-focus the active digit input
+  useEffect(() => {
+    if (inputRefs.current[activeDigit]) {
+      inputRefs.current[activeDigit]?.focus();
+    }
+  }, [activeDigit]);
+
+  // Format time as MM:SS
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Calculate progress percentage for the timer
+  const timerProgress = (timeLeft / 300) * 100;
+
+  // Handle digit input
+  const handleDigitChange = (index: number, value: string) => {
+    // Only allow single digit numbers
+    if (!/^[0-9]?$/.test(value)) return;
+
+    const newDigitValues = [...digitValues];
+    newDigitValues[index] = value;
+    setDigitValues(newDigitValues);
+
+    // Combine digits into token
+    const newToken = newDigitValues.join('');
+    setToken(newToken);
+    setTokenError('');
+
+    // Auto-focus next input if value is entered
+    if (value && index < 5) {
+      setActiveDigit(index + 1);
+    }
+  };
+
+  // Handle backspace
+  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace') {
+      if (!digitValues[index] && index > 0) {
+        // If current input is empty and backspace is pressed, focus previous input
+        setActiveDigit(index - 1);
+      }
+    } else if (e.key === 'ArrowLeft' && index > 0) {
+      setActiveDigit(index - 1);
+    } else if (e.key === 'ArrowRight' && index < 5) {
+      setActiveDigit(index + 1);
+    }
+  };
+
+  // Handle paste
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData('text');
+    const digits = pastedData.replace(/\D/g, '').slice(0, 6).split('');
+    
+    const newDigitValues = [...digitValues];
+    digits.forEach((digit, index) => {
+      if (index < 6) newDigitValues[index] = digit;
+    });
+    
+    setDigitValues(newDigitValues);
+    setToken(newDigitValues.join(''));
+    
+    // Focus the next empty input or the last one
+    const nextEmptyIndex = newDigitValues.findIndex(v => !v);
+    setActiveDigit(nextEmptyIndex >= 0 ? nextEmptyIndex : 5);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validate token
+    if (token.length !== 6) {
+      setTokenError('Por favor ingrese el código completo de 6 dígitos');
+      return;
+    }
+    
+    if (!/^\d{6}$/.test(token)) {
+      setTokenError('El código debe contener 6 dígitos');
+      return;
+    }
+    
+    onVerify(token);
+  };
+
+  // Get color based on time left
+  const getTimerColor = () => {
+    if (timeLeft > 120) return theme.palette.success.main; // > 2 minutes
+    if (timeLeft > 60) return theme.palette.warning.main; // > 1 minute
+    return theme.palette.error.main; // < 1 minute
+  };
+
+  // Use the masked email from props or create a fallback
+  const getMaskedEmail = () => {
+    if (maskedEmail) {
+      return maskedEmail;
+    }
+    // Fallback if no masked email is provided
+    const name = username;
+    const maskedName = name.length <= 2 
+      ? name.charAt(0) + '***' 
+      : name.charAt(0) + '***' + name.charAt(name.length - 1);
+    return `${maskedName}@example.com`;
+  };
+
+  return (
+    <Fade in={true} timeout={800}>
+      <Paper 
+        elevation={3} 
+        sx={{ 
+          p: 4, 
+          maxWidth: 500, 
+          mx: 'auto', 
+          mt: 4,
+          borderRadius: 2,
+          position: 'relative',
+          overflow: 'hidden',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '4px',
+            background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+          }
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+          <Zoom in={true} style={{ transitionDelay: '250ms' }}>
+            <LockIcon 
+              sx={{ 
+                fontSize: 40, 
+                color: theme.palette.primary.main,
+                mr: 2,
+                p: 1,
+                borderRadius: '50%',
+                bgcolor: `${theme.palette.primary.main}15`,
+              }} 
+            />
+          </Zoom>
+          <Box>
+            <Typography variant="h5" component="h2" gutterBottom fontWeight="500">
+              Verificación de Seguridad
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Protegiendo tu cuenta con verificación adicional
+            </Typography>
+          </Box>
+        </Box>
+        
+        <Divider sx={{ mb: 3 }} />
+        
+        <Grow in={true} style={{ transformOrigin: '0 0 0' }} timeout={1000}>
+          <Box sx={{ mb: 3, display: 'flex', alignItems: 'center' }}>
+            <EmailIcon sx={{ color: theme.palette.info.main, mr: 1.5 }} />
+            <Typography variant="body1">
+              Hemos enviado un código de verificación a <strong>{getMaskedEmail()}</strong>
+            </Typography>
+          </Box>
+        </Grow>
+        
+        {error && (
+          <Fade in={!!error}>
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {error}
+            </Alert>
+          </Fade>
+        )}
+        
+        <Box component="form" onSubmit={handleSubmit}>
+          <Typography variant="subtitle2" gutterBottom sx={{ mb: 2 }}>
+            Ingresa el código de 6 dígitos:
+          </Typography>
+          
+          <Box 
+            sx={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              mb: 3,
+              mx: 'auto',
+              width: '100%',
+              maxWidth: 360
+            }}
+          >
+            {digitValues.map((digit, index) => (
+              <TextField
+                key={index}
+                value={digit}
+                onChange={(e) => handleDigitChange(index, e.target.value)}
+                onKeyDown={(e) => handleKeyDown(index, e)}
+                onPaste={index === 0 ? handlePaste : undefined}
+                onFocus={() => setActiveDigit(index)}
+                inputRef={el => inputRefs.current[index] = el}
+                autoFocus={index === 0}
+                inputProps={{
+                  maxLength: 1,
+                  style: { 
+                    textAlign: 'center',
+                    fontSize: '1.5rem',
+                    fontWeight: 'bold',
+                    padding: '8px 0',
+                    caretColor: 'transparent'
+                  }
+                }}
+                sx={{
+                  width: '48px',
+                  '& .MuiOutlinedInput-root': {
+                    '& fieldset': {
+                      borderColor: digit ? theme.palette.primary.main : theme.palette.divider,
+                      transition: 'border-color 0.3s'
+                    },
+                    '&:hover fieldset': {
+                      borderColor: theme.palette.primary.main
+                    },
+                    '&.Mui-focused fieldset': {
+                      borderColor: theme.palette.primary.main,
+                      borderWidth: 2
+                    }
+                  },
+                  '& input': {
+                    transition: 'all 0.2s'
+                  },
+                  '& input:not(:placeholder-shown)': {
+                    backgroundColor: `${theme.palette.primary.main}10`
+                  }
+                }}
+              />
+            ))}
+          </Box>
+          
+          {tokenError && (
+            <Typography color="error" variant="body2" sx={{ mb: 2, textAlign: 'center' }}>
+              {tokenError}
+            </Typography>
+          )}
+          
+          <Box 
+            sx={{ 
+              display: 'flex', 
+              justifyContent: 'center', 
+              alignItems: 'center', 
+              mb: 3,
+              position: 'relative',
+              height: 60
+            }}
+          >
+            <Box
+              sx={{
+                position: 'relative',
+                width: 60,
+                height: 60,
+              }}
+            >
+              <CircularProgress
+                variant="determinate"
+                value={100}
+                size={60}
+                thickness={4}
+                sx={{ color: theme.palette.divider, position: 'absolute' }}
+              />
+              <CircularProgress
+                variant="determinate"
+                value={timerProgress}
+                size={60}
+                thickness={4}
+                sx={{ 
+                  color: getTimerColor(),
+                  position: 'absolute',
+                  transition: 'color 0.5s'
+                }}
+              />
+              <Box
+                sx={{
+                  top: 0,
+                  left: 0,
+                  bottom: 0,
+                  right: 0,
+                  position: 'absolute',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Typography
+                  variant="caption"
+                  component="div"
+                  sx={{ 
+                    fontSize: '0.9rem', 
+                    fontWeight: 'bold',
+                    color: getTimerColor()
+                  }}
+                >
+                  {formatTime(timeLeft)}
+                </Typography>
+              </Box>
+            </Box>
+          </Box>
+          
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
+            <Button
+              variant="outlined"
+              onClick={onCancel}
+              disabled={loading}
+              startIcon={<ArrowBackIcon />}
+              sx={{ 
+                borderRadius: 2,
+                transition: 'all 0.3s',
+                '&:hover': {
+                  transform: 'translateX(-3px)'
+                }
+              }}
+            >
+              Volver
+            </Button>
+            
+            <Button
+              variant="text"
+              onClick={() => {
+                // Reset timer and request new token
+                setTimeLeft(300);
+                setDigitValues(['', '', '', '', '', '']);
+                setToken('');
+                setActiveDigit(0);
+                onCancel(); // This will trigger a new token request
+              }}
+              disabled={loading}
+              startIcon={<RefreshIcon />}
+              sx={{ 
+                borderRadius: 2,
+                transition: 'all 0.3s',
+                '&:hover': {
+                  transform: 'rotate(15deg)'
+                }
+              }}
+            >
+              Nuevo código
+            </Button>
+            
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={loading || timeLeft <= 0 || token.length !== 6}
+              endIcon={loading ? undefined : <CheckIcon />}
+              sx={{ 
+                borderRadius: 2,
+                position: 'relative',
+                overflow: 'hidden',
+                transition: 'all 0.3s',
+                '&:not(:disabled):hover': {
+                  transform: 'translateY(-3px)',
+                  boxShadow: 4
+                },
+                '&::after': {
+                  content: '""',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  background: 'linear-gradient(rgba(255,255,255,0.1), rgba(255,255,255,0))',
+                  opacity: 0,
+                  transition: 'opacity 0.3s',
+                },
+                '&:hover::after': {
+                  opacity: 1
+                }
+              }}
+            >
+              {loading ? <CircularProgress size={24} /> : 'Verificar'}
+            </Button>
+          </Box>
+        </Box>
+      </Paper>
+    </Fade>
+  );
+};
+
+export default TwoFactorAuth;

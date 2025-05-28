@@ -1,0 +1,38 @@
+// Configuración de la API
+export const API_BASE_URL = 'http://localhost:8080';
+
+// Endpoints
+export const API_ENDPOINTS = {
+  AUTH: {
+    LOGIN: '/api/auth/signin',
+    REGISTER: '/api/auth/signup',
+    VERIFY_TOKEN: '/api/auth/verify-token',
+  },
+  USERS: {
+    PROFILE: '/api/users/me',
+    BY_ID: (id: number) => `/api/users/${id}`,
+  },
+  WALLETS: {
+    ALL: '/api/wallets',
+    BY_ID: (id: number) => `/api/wallets/${id}`,
+    TRANSACTIONS: (id: number) => `/api/wallets/${id}/transactions`,
+  },
+  TRANSACTIONS: {
+    CREATE: '/api/transactions',
+    BY_ID: (id: number) => `/api/transactions/${id}`,
+  },
+  SCHEDULED_TRANSACTIONS: {
+    ALL: '/api/scheduled-transactions',
+    BY_ID: (id: number) => `/api/scheduled-transactions/${id}`,
+  },
+  POINTS: {
+    ACCOUNT: '/api/points/account',
+    HISTORY: '/api/points/history',
+    REDEEM: '/api/points/redeem',
+  },
+  NOTIFICATIONS: {
+    ALL: '/api/notifications',
+    UNREAD: '/api/notifications/unread',
+    MARK_READ: (id: number) => `/api/notifications/${id}/read`,
+  },
+};

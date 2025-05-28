@@ -1,0 +1,95 @@
+package org.example.model;
+
+import jakarta.persistence.*;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+@Entity
+@Table(name = "wallets")
+@Data
+@NoArgsConstructor
+public class Wallet {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false)
+    private String name;
+
+    @Column(nullable = false)
+    private String description;
+
+    @Column(name = "balance", nullable = false)
+    private BigDecimal balance = BigDecimal.ZERO;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "wallet_type", nullable = false)
+    private WalletType walletType;
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @OneToMany(mappedBy = "sourceWallet", cascade = CascadeType.ALL)
+    private List<Transaction> outgoingTransactions = new ArrayList<>();
+
+    @OneToMany(mappedBy = "targetWallet", cascade = CascadeType.ALL)
+    private List<Transaction> incomingTransactions = new ArrayList<>();
+
+    @OneToMany(mappedBy = "wallet", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ScheduledTransaction> scheduledTransactions = new ArrayList<>();
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * Añade una transacción programada a este monedero
+     */
+    public void addScheduledTransaction(ScheduledTransaction transaction) {
+        scheduledTransactions.add(transaction);
+        transaction.setWallet(this);
+    }
+
+    /**
+     * Elimina una transacción programada de este monedero
+     */
+    public void removeScheduledTransaction(ScheduledTransaction transaction) {
+        scheduledTransactions.remove(transaction);
+        transaction.setWallet(null);
+    }
+
+    /**
+     * Actualiza el saldo del monedero
+     * @param amount Cantidad a añadir (positiva) o restar (negativa)
+     */
+    public void updateBalance(BigDecimal amount) {
+        this.balance = this.balance.add(amount);
+    }
+
+    /**
+     * Verifica si hay saldo suficiente para una operación
+     * @param amount Cantidad a verificar
+     * @return true si hay saldo suficiente, false en caso contrario
+     */
+    public boolean hasSufficientBalance(BigDecimal amount) {
+        return this.balance.compareTo(amount) >= 0;
+    }
+}

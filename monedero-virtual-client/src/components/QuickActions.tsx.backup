@@ -1,0 +1,140 @@
+import React from 'react';
+import {
+  Paper,
+  Typography,
+  Divider,
+  Box,
+  Button,
+  Grid,
+  useTheme,
+  alpha
+} from '@mui/material';
+import {
+  Bolt as BoltIcon,
+  CalendarMonth as CalendarIcon,
+  Savings as SavingsIcon,
+  BarChart as BarChartIcon,
+  Lightbulb as TipIcon
+} from '@mui/icons-material';
+
+interface QuickAction {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  action: () => void;
+  color: string;
+}
+
+const QuickActions: React.FC = () => {
+  const theme = useTheme();
+
+  // Acciones rápidas para el usuario
+  const quickActions: QuickAction[] = [
+    {
+      icon: <BoltIcon />,
+      title: 'Transferencia rápida',
+      description: 'Envía dinero a tus contactos frecuentes',
+      action: () => console.log('Transferencia rápida'),
+      color: theme.palette.primary.main
+    },
+    {
+      icon: <CalendarIcon />,
+      title: 'Programar pago',
+      description: 'Configura pagos automáticos',
+      action: () => console.log('Programar pago'),
+      color: theme.palette.secondary.main
+    },
+    {
+      icon: <SavingsIcon />,
+      title: 'Meta de ahorro',
+      description: 'Crea una nueva meta financiera',
+      action: () => console.log('Meta de ahorro'),
+      color: theme.palette.success.main
+    },
+    {
+      icon: <BarChartIcon />,
+      title: 'Reporte mensual',
+      description: 'Genera un informe de tus finanzas',
+      action: () => console.log('Reporte mensual'),
+      color: theme.palette.info.main
+    }
+  ];
+
+  // Consejo financiero aleatorio
+  const financialTips = [
+    "Ahorra al menos el 20% de tus ingresos mensuales.",
+    "Establece un fondo de emergencia para 3-6 meses de gastos.",
+    "Revisa tus suscripciones mensuales y elimina las que no uses.",
+    "Automatiza tus ahorros con transferencias programadas.",
+    "Diversifica tus inversiones para reducir el riesgo."
+  ];
+  
+  const randomTip = financialTips[Math.floor(Math.random() * financialTips.length)];
+
+  return (
+    <Paper elevation={3} sx={{ p: 2 }}>
+      <Typography variant="h6" gutterBottom>
+        Acciones Rápidas
+      </Typography>
+      <Divider sx={{ mb: 2 }} />
+      
+      <Grid container spacing={2}>
+        {quickActions.map((action, index) => (
+          <Grid item xs={6} key={index}>
+            <Button
+              fullWidth
+              variant="outlined"
+              onClick={action.action}
+              startIcon={React.cloneElement(action.icon as React.ReactElement, { 
+                sx: { color: action.color } 
+              })}
+              sx={{
+                justifyContent: 'flex-start',
+                p: 1.5,
+                borderColor: alpha(action.color, 0.3),
+                '&:hover': {
+                  borderColor: action.color,
+                  backgroundColor: alpha(action.color, 0.05)
+                },
+                height: '100%',
+                textAlign: 'left'
+              }}
+            >
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: action.color }}>
+                  {action.title}
+                </Typography>
+                <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
+                  {action.description}
+                </Typography>
+              </Box>
+            </Button>
+          </Grid>
+        ))}
+      </Grid>
+      
+      <Box 
+        sx={{ 
+          mt: 2, 
+          p: 1.5, 
+          bgcolor: alpha(theme.palette.warning.main, 0.1),
+          borderRadius: 1,
+          display: 'flex',
+          alignItems: 'flex-start'
+        }}
+      >
+        <TipIcon sx={{ color: theme.palette.warning.main, mr: 1, mt: 0.3 }} />
+        <Box>
+          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: theme.palette.warning.dark }}>
+            Consejo del día
+          </Typography>
+          <Typography variant="body2">
+            {randomTip}
+          </Typography>
+        </Box>
+      </Box>
+    </Paper>
+  );
+};
+
+export default QuickActions;
